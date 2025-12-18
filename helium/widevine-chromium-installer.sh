@@ -43,7 +43,7 @@ cleanup() {
 trap cleanup EXIT
 
 # -------------------------
-# Root check (explicit sudo)
+# Root check
 # -------------------------
 if [[ $EUID -ne 0 ]]; then
   warn "This installer must be run as root."
