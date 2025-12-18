@@ -3,10 +3,6 @@ set -Eeuo pipefail
 
 # ─────────────────────────────────────────────────────────────
 #  Chromium Widevine CDM Installer
-#  - Mozilla-verified (SHA-512)
-#  - Safe sudo re-exec (file + curl|bash)
-#  - Guaranteed cleanup
-#  - Marker-based uninstall
 # ─────────────────────────────────────────────────────────────
 
 # -------------------------
@@ -47,7 +43,7 @@ trap cleanup EXIT
 # -------------------------
 if [[ $EUID -ne 0 ]]; then
   warn "This installer must be run as root."
-  echo "Please re-run using sudo" >&2
+  echo "Please re-run using sudo." >&2
   exit 1
 fi
 
@@ -59,9 +55,9 @@ for dep in bash curl jq unzip sha512sum; do
 done
 
 # -------------------------
-# Uninstall mode
+# Uninstall function
 # -------------------------
-if [[ "${1:-}" == "--uninstall" ]]; then
+do_uninstall() {
   [[ -f "$MARKER_FILE" ]] || fatal "Installer marker not found — refusing uninstall"
 
   info "Uninstalling Widevine CDM"
@@ -70,6 +66,13 @@ if [[ "${1:-}" == "--uninstall" ]]; then
 
   success "Widevine CDM uninstalled"
   exit 0
+}
+
+# -------------------------
+# CLI uninstall mode
+# -------------------------
+if [[ "${1:-}" == "--uninstall" ]]; then
+  do_uninstall
 fi
 
 # -------------------------
@@ -77,6 +80,10 @@ fi
 # -------------------------
 if [[ -f "$MARKER_FILE" ]]; then
   warn "Widevine CDM was installed by this installer"
+
+  # Ensure interactive terminal exists
+  [[ -t 1 ]] || fatal "No interactive terminal available"
+
   echo
   echo "Choose an action:"
   echo "  [1] Reinstall"
@@ -86,7 +93,7 @@ if [[ -f "$MARKER_FILE" ]]; then
 
   case "$choice" in
     1) info "Reinstalling…" ;;
-    2) exec "$0" --uninstall ;;
+    2) do_uninstall ;;
     *) fatal "Aborted by user" ;;
   esac
 fi
@@ -133,7 +140,6 @@ echo "${HASH_VALUE}  ${CRX_FILE}" | sha512sum -c -
 # Extract
 # -------------------------
 info "Extracting Widevine CDM"
-# CRX3 files contain a header; unzip warns but extracts correctly
 unzip -q "$CRX_FILE" -d "$TMP_DIR" 2>/dev/null || true
 
 # -------------------------
