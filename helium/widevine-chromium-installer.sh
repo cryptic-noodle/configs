@@ -82,7 +82,7 @@ if [[ -f "$MARKER_FILE" ]]; then
   echo "  [1] Reinstall"
   echo "  [2] Uninstall"
   echo "  [3] Abort"
-  read -rp "Selection [1-3]: " choice
+  read -rp "Selection [1-3]: " choice </dev/tty
 
   case "$choice" in
     1) info "Reinstalling…" ;;
