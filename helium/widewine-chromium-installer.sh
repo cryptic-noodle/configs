@@ -3,15 +3,24 @@ set -Eeuo pipefail
 
 # ─────────────────────────────────────────────────────────────
 #  Chromium Widevine CDM Installer
-#  - Mozilla-verified
-#  - SHA-512 only
-#  - Safe sudo re-exec
+#  - Mozilla-verified (SHA-512)
+#  - Safe sudo re-exec (file + curl|bash)
 #  - Guaranteed cleanup
-#  - Marker-based uninstall support
+#  - Marker-based uninstall
 # ─────────────────────────────────────────────────────────────
 
 # -------------------------
-# Colors & logging helpers
+# Configuration
+# -------------------------
+SCRIPT_URL="https://raw.githubusercontent.com/cryptic-noodle/configs/refs/heads/main/helium/widewine-chromium-installer.sh"
+
+INSTALL_DIR="/usr/lib/chromium/WidevineCdm"
+LICENSE_DIR="/usr/share/licenses/chromium-widevine"
+SYMLINK="/usr/lib/chromium/libwidevinecdm.so"
+MARKER_FILE="$INSTALL_DIR/.installed-by-widevine-installer"
+
+# -------------------------
+# Colors & logging
 # -------------------------
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -25,63 +34,60 @@ warn()    { echo -e "${YELLOW}⚠${RESET} $*"; }
 fatal()   { echo -e "${RED}✖${RESET} $*" >&2; exit 1; }
 
 # -------------------------
-# Paths
-# -------------------------
-INSTALL_DIR="/usr/lib/chromium/WidevineCdm"
-LICENSE_DIR="/usr/share/licenses/chromium-widevine"
-SYMLINK="/usr/lib/chromium/libwidevinecdm.so"
-MARKER_FILE="$INSTALL_DIR/.installed-by-widevine-installer"
-
-# -------------------------
-# Cleanup handler
+# Cleanup (always)
 # -------------------------
 cleanup() {
-  local exit_code=$?
+  local ec=$?
   [[ -n "${TMP_DIR:-}" && -d "$TMP_DIR" ]] && rm -rf "$TMP_DIR"
-  (( exit_code != 0 )) && echo -e "${RED}✖${RESET} Script failed (exit code $exit_code)" >&2
-  exit "$exit_code"
+  (( ec != 0 )) && echo -e "${RED}✖${RESET} Script failed (exit code $ec)" >&2
+  exit "$ec"
 }
-
 trap cleanup EXIT
 
 # -------------------------
-# Root check (auto sudo)
+# Root check (pipe-safe)
 # -------------------------
 if [[ $EUID -ne 0 ]]; then
   warn "Root privileges required"
   info "Re-running with sudo…"
-  SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0")"
-  exec sudo --preserve-env=PATH bash "$SCRIPT_PATH" "$@"
+
+  if [[ -t 0 ]]; then
+    # Executed from a real file
+    SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0")"
+    exec sudo --preserve-env=PATH bash "$SCRIPT_PATH" "$@"
+  else
+    # Executed via curl | bash (stdin)
+    exec sudo --preserve-env=PATH bash -c \
+      "$(curl -fsSL "$SCRIPT_URL")" bash "$@"
+  fi
 fi
 
 # -------------------------
-# Dependency check
+# Dependencies
 # -------------------------
 for dep in bash curl jq unzip sha512sum; do
   command -v "$dep" &>/dev/null || fatal "Missing dependency: $dep"
 done
 
 # -------------------------
-# Uninstall logic
+# Uninstall mode
 # -------------------------
 if [[ "${1:-}" == "--uninstall" ]]; then
-  [[ -f "$MARKER_FILE" ]] || fatal "No installer marker found — refusing to uninstall"
+  [[ -f "$MARKER_FILE" ]] || fatal "Installer marker not found — refusing uninstall"
 
   info "Uninstalling Widevine CDM"
-
   rm -f "$SYMLINK"
-  rm -rf "$INSTALL_DIR"
-  rm -rf "$LICENSE_DIR"
+  rm -rf "$INSTALL_DIR" "$LICENSE_DIR"
 
-  success "Widevine CDM uninstalled successfully"
+  success "Widevine CDM uninstalled"
   exit 0
 fi
 
 # -------------------------
-# Detect existing install
+# Existing install detection
 # -------------------------
 if [[ -f "$MARKER_FILE" ]]; then
-  warn "Widevine CDM was previously installed by this installer"
+  warn "Widevine CDM was installed by this installer"
   echo
   echo "Choose an action:"
   echo "  [1] Reinstall"
@@ -90,14 +96,14 @@ if [[ -f "$MARKER_FILE" ]]; then
   read -rp "Selection [1-3]: " choice
 
   case "$choice" in
-    1) info "Proceeding with reinstall…" ;;
+    1) info "Reinstalling…" ;;
     2) exec "$0" --uninstall ;;
     *) fatal "Aborted by user" ;;
   esac
 fi
 
 # -------------------------
-# Fetch Widevine metadata
+# Fetch metadata
 # -------------------------
 info "Fetching Widevine metadata from Mozilla"
 
@@ -109,19 +115,14 @@ HASH_FUNCTION="$(jq -r '.hashFunction' <<<"$WIDEVINE_JSON")"
 SOURCE_URL="$(jq -r '.vendors["gmp-widevinecdm"].platforms["Linux_x86_64-gcc3"].mirrorUrls[0]' <<<"$WIDEVINE_JSON")"
 HASH_VALUE="$(jq -r '.vendors["gmp-widevinecdm"].platforms["Linux_x86_64-gcc3"].hashValue' <<<"$WIDEVINE_JSON")"
 
-[[ "$HASH_FUNCTION" == "sha512" ]] \
-  || fatal "Unsupported hash function: $HASH_FUNCTION (expected sha512)"
+[[ "$HASH_FUNCTION" == "sha512" ]] || fatal "Unsupported hash function: $HASH_FUNCTION"
+[[ -n "$SOURCE_URL" && "$SOURCE_URL" != "null" ]] || fatal "Failed to retrieve download URL"
+[[ -n "$HASH_VALUE" && "$HASH_VALUE" != "null" ]] || fatal "Failed to retrieve checksum"
 
-[[ -n "$SOURCE_URL" && "$SOURCE_URL" != "null" ]] \
-  || fatal "Failed to retrieve Widevine URL"
-
-[[ -n "$HASH_VALUE" && "$HASH_VALUE" != "null" ]] \
-  || fatal "Failed to retrieve Widevine hash value"
-
-success "Metadata validated (sha512)"
+success "Metadata validated (SHA-512)"
 
 # -------------------------
-# Temporary workspace
+# Workspace
 # -------------------------
 TMP_DIR="$(mktemp -d)"
 CRX_FILE="$TMP_DIR/$(basename "$SOURCE_URL")"
@@ -136,13 +137,14 @@ curl -fL --progress-bar -o "$CRX_FILE" "$SOURCE_URL"
 # -------------------------
 # Verify checksum
 # -------------------------
-info "Verifying SHA-512 checksum"
+info "Verifying checksum"
 echo "${HASH_VALUE}  ${CRX_FILE}" | sha512sum -c -
 
 # -------------------------
 # Extract
 # -------------------------
 info "Extracting Widevine CDM"
+# CRX3 files contain a header; unzip warns but extracts correctly
 unzip -q "$CRX_FILE" -d "$TMP_DIR" 2>/dev/null || true
 
 # -------------------------
@@ -152,8 +154,8 @@ WIDEVINE_SO="$TMP_DIR/_platform_specific/linux_x64/libwidevinecdm.so"
 MANIFEST="$TMP_DIR/manifest.json"
 LICENSE="$TMP_DIR/LICENSE"
 
-for file in "$WIDEVINE_SO" "$MANIFEST" "$LICENSE"; do
-  [[ -f "$file" ]] || fatal "Missing file: $(basename "$file")"
+for f in "$WIDEVINE_SO" "$MANIFEST" "$LICENSE"; do
+  [[ -f "$f" ]] || fatal "Missing file: $(basename "$f")"
 done
 
 # -------------------------
@@ -166,21 +168,16 @@ mkdir -p "$INSTALL_DIR/_platform_specific/linux_x64" "$LICENSE_DIR"
 install -Dm755 "$WIDEVINE_SO" \
   "$INSTALL_DIR/_platform_specific/linux_x64/libwidevinecdm.so"
 
-install -Dm644 "$MANIFEST" \
-  "$INSTALL_DIR/manifest.json"
-
-install -Dm644 "$LICENSE" \
-  "$INSTALL_DIR/LICENSE"
-
-install -Dm644 "$LICENSE" \
-  "$LICENSE_DIR/LICENSE"
+install -Dm644 "$MANIFEST" "$INSTALL_DIR/manifest.json"
+install -Dm644 "$LICENSE" "$INSTALL_DIR/LICENSE"
+install -Dm644 "$LICENSE" "$LICENSE_DIR/LICENSE"
 
 ln -sf \
   "$INSTALL_DIR/_platform_specific/linux_x64/libwidevinecdm.so" \
   "$SYMLINK"
 
 # -------------------------
-# Marker file (LAST STEP)
+# Marker (LAST STEP)
 # -------------------------
 cat >"$MARKER_FILE" <<EOF
 Installed by chromium-widevine installer
@@ -188,4 +185,3 @@ Source: Mozilla Widevine CDM
 EOF
 
 success "Widevine CDM installed successfully"
-
