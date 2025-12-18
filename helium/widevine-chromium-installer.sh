@@ -34,7 +34,7 @@ warn()    { echo -e "${YELLOW}⚠${RESET} $*"; }
 fatal()   { echo -e "${RED}✖${RESET} $*" >&2; exit 1; }
 
 # -------------------------
-# Cleanup (always)
+# Cleanup
 # -------------------------
 cleanup() {
   local ec=$?
@@ -45,22 +45,24 @@ cleanup() {
 trap cleanup EXIT
 
 # -------------------------
-# Root check (pipe-safe)
+# Root check
 # -------------------------
 if [[ $EUID -ne 0 ]]; then
   warn "Root privileges required"
   info "Re-running with sudo…"
 
   if [[ -t 0 ]]; then
-    # Executed from a real file
+    # Script executed from a file
     SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0")"
     exec sudo --preserve-env=PATH bash "$SCRIPT_PATH" "$@"
   else
-    # Executed via curl | bash (stdin)
-    exec sudo --preserve-env=PATH bash -c \
-      "$(curl -fsSL "$SCRIPT_URL")" bash "$@"
+    # Script executed via pipe (curl | bash, wget | bash)
+    TMP_SCRIPT="$(mktemp)"
+    cat >"$TMP_SCRIPT"
+    exec sudo --preserve-env=PATH bash "$TMP_SCRIPT" "$@"
   fi
 fi
+
 
 # -------------------------
 # Dependencies
@@ -177,7 +179,7 @@ ln -sf \
   "$SYMLINK"
 
 # -------------------------
-# Marker (LAST STEP)
+# Marker
 # -------------------------
 cat >"$MARKER_FILE" <<EOF
 Installed by chromium-widevine installer
