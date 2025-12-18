@@ -47,7 +47,7 @@ trap cleanup EXIT
 # -------------------------
 if [[ $EUID -ne 0 ]]; then
   warn "This installer must be run as root."
-  echo "Please re-run using sudo, for example:" >&2
+  echo "Please re-run using sudo" >&2
   exit 1
 fi
 
