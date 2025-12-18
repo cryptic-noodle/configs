@@ -43,24 +43,13 @@ cleanup() {
 trap cleanup EXIT
 
 # -------------------------
-# Root check
+# Root check (explicit sudo)
 # -------------------------
 if [[ $EUID -ne 0 ]]; then
-  warn "Root privileges required"
-  info "Re-running with sudo…"
-
-  if [[ -t 0 ]]; then
-    # Script executed from a file
-    SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0")"
-    exec sudo --preserve-env=PATH bash "$SCRIPT_PATH" "$@"
-  else
-    # Script executed via pipe (curl | bash, wget | bash)
-    TMP_SCRIPT="$(mktemp)"
-    cat >"$TMP_SCRIPT"
-    exec sudo --preserve-env=PATH bash "$TMP_SCRIPT" "$@"
-  fi
+  warn "This installer must be run as root."
+  echo "Please re-run using sudo, for example:" >&2
+  exit 1
 fi
-
 
 # -------------------------
 # Dependencies
