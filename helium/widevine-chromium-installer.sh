@@ -12,8 +12,6 @@ set -Eeuo pipefail
 # -------------------------
 # Configuration
 # -------------------------
-SCRIPT_URL="https://raw.githubusercontent.com/cryptic-noodle/configs/refs/heads/main/helium/widewine-chromium-installer.sh"
-
 INSTALL_DIR="/usr/lib/chromium/WidevineCdm"
 LICENSE_DIR="/usr/share/licenses/chromium-widevine"
 SYMLINK="/usr/lib/chromium/libwidevinecdm.so"
