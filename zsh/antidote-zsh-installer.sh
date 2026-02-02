@@ -61,7 +61,9 @@ if [[ "$CURRENT_SHELL" != "$ZSH_PATH" ]]; then
 
   if [[ "$set_shell" =~ ^[Yy]$ ]]; then
     info "Changing default shell to Zsh"
-    if chsh -s "$ZSH_PATH"; then
+
+    # IMPORTANT: redirect input so password prompt works in pipe installs
+    if chsh -s "$ZSH_PATH" </dev/tty; then
       success "Default shell updated"
     else
       warn "Failed to change shell (system may restrict chsh)"
@@ -187,8 +189,9 @@ fi
 # -------------------------
 # First-run plugin load
 # -------------------------
-info "Running Antidote once to initialize plugins"
-zsh -c "source ~/.antidote/antidote.zsh && antidote load" || warn "Plugin load returned non-zero"
+info "Initializing Antidote once"
+zsh -c "source ~/.antidote/antidote.zsh && antidote load" \
+  || warn "Plugin initialization returned non-zero"
 
 # -------------------------
 # Recovery note
@@ -209,4 +212,3 @@ if [[ "$restart_now" =~ ^[Yy]$ ]]; then
 else
   echo "You can restart anytime with: exec zsh"
 fi
-
