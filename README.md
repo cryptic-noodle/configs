@@ -17,6 +17,8 @@ If you run it again after installation it will give option to uninstall, or just
 ## Antidote-Zsh Installer
 Powerlevel10k + zsh plugins selections
 
+Download the [recommended font](https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf)
+
 READ THE SCRIPT BEFORE RUNNING (NEVER trust a random script on the internet)
 
 ```
