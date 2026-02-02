@@ -20,9 +20,9 @@ Powerlevel10k + zsh plugins selections
 READ THE SCRIPT BEFORE RUNNING (NEVER trust a random script on the internet)
 
 ```
-curl -fsSL https://raw.githubusercontent.com/cryptic-noodle/configs/main/zsh/antidote-zsh-installer.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/cryptic-noodle/configs/main/zsh/antidote-zsh-installer.sh | bash
 ```
 or
 ```
-wget -qO- https://raw.githubusercontent.com/cryptic-noodle/configs/main/zsh/antidote-zsh-installer.sh | sudo bash
+wget -qO- https://raw.githubusercontent.com/cryptic-noodle/configs/main/zsh/antidote-zsh-installer.sh |  bash
 ```

@@ -49,6 +49,29 @@ fi
 touch "$PLUGINS_FILE"
 
 # -------------------------
+# Optional: Set Zsh as default shell
+# -------------------------
+CURRENT_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
+ZSH_PATH="$(command -v zsh)"
+
+if [[ "$CURRENT_SHELL" != "$ZSH_PATH" ]]; then
+  echo
+  warn "Your current login shell is: $CURRENT_SHELL"
+  read -rp "Set Zsh ($ZSH_PATH) as default shell? [y/N]: " set_shell </dev/tty
+
+  if [[ "$set_shell" =~ ^[Yy]$ ]]; then
+    info "Changing default shell to Zsh"
+    if chsh -s "$ZSH_PATH"; then
+      success "Default shell updated"
+    else
+      warn "Failed to change shell (system may restrict chsh)"
+    fi
+  fi
+else
+  success "Zsh is already your default shell"
+fi
+
+# -------------------------
 # Managed plugin catalog
 # -------------------------
 PLUGINS=(
@@ -129,18 +152,20 @@ while true; do
 done
 
 # -------------------------
-# Ensure .zshrc
+# Ensure .zshrc exists
 # -------------------------
 if [[ ! -f "$ZSHRC_FILE" ]]; then
   info "Creating .zshrc"
+
   cat >"$ZSHRC_FILE" <<'EOF'
-# Antidote
+# Antidote plugin manager
 source ~/.antidote/antidote.zsh
 antidote load
 
-# Aliases
+# Optional aliases
 [[ -f ~/.zshrc_aliases ]] && source ~/.zshrc_aliases
 EOF
+
 else
   info ".zshrc already exists (not overwriting)"
 fi
@@ -149,6 +174,7 @@ fi
 # Aliases (optional)
 # -------------------------
 read -rp "Install common aliases? [y/N]: " install_aliases </dev/tty
+
 if [[ "$install_aliases" =~ ^[Yy]$ ]]; then
   cat >"$ALIASES_FILE" <<'EOF'
 alias reload="exec zsh"
@@ -159,14 +185,28 @@ EOF
 fi
 
 # -------------------------
-# Final note (optional recovery)
+# First-run plugin load
+# -------------------------
+info "Running Antidote once to initialize plugins"
+zsh -c "source ~/.antidote/antidote.zsh && antidote load" || warn "Plugin load returned non-zero"
+
+# -------------------------
+# Recovery note
 # -------------------------
 echo
-warn "If plugins do not load correctly, you can force regeneration with:"
+warn "If plugins do not load correctly, you can force regeneration manually:"
 echo "  antidote bundle < ~/.zsh_plugins.txt > ~/.zsh_plugins.zsh"
 echo
 
-exec zsh
-
+# -------------------------
+# Finish
+# -------------------------
 success "Zsh + Antidote setup complete"
-echo "Restart your shell or run: exec zsh"
+
+read -rp "Restart shell now (exec zsh)? [y/N]: " restart_now </dev/tty
+if [[ "$restart_now" =~ ^[Yy]$ ]]; then
+  exec zsh
+else
+  echo "You can restart anytime with: exec zsh"
+fi
+
