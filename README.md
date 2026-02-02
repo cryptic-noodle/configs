@@ -12,3 +12,17 @@ or
 wget -qO- https://raw.githubusercontent.com/cryptic-noodle/configs/main/helium/widevine-chromium-installer.sh | sudo bash
 ```
 If you run it again after installation it will give option to uninstall, or just run with --uninstall
+
+
+Antidote-Zsh Installer
+Powerlevel10k + zsh plugins selections
+
+READ THE SCRIPT BEFORE RUNNING (NEVER trust a random script on the internet)
+
+```
+curl -fsSL https://raw.githubusercontent.com/cryptic-noodle/configs/main/zsh/antidote-zsh-installer.sh | sudo bash
+```
+or
+```
+wget -qO- https://raw.githubusercontent.com/cryptic-noodle/configs/main/zsh/antidote-zsh-installer.sh | sudo bash
+```
