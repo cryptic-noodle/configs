@@ -14,7 +14,7 @@ wget -qO- https://raw.githubusercontent.com/cryptic-noodle/configs/main/helium/w
 If you run it again after installation it will give option to uninstall, or just run with --uninstall
 
 
-Antidote-Zsh Installer
+## Antidote-Zsh Installer
 Powerlevel10k + zsh plugins selections
 
 READ THE SCRIPT BEFORE RUNNING (NEVER trust a random script on the internet)
